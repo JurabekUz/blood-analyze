@@ -48,3 +48,11 @@ class PatientSelectSerializer(ModelSerializer):
     class Meta:
         model = Patient
         fields = ['value', 'label']
+
+
+class PatientFullNameSerializer(ModelSerializer):
+    full_name = CharField(source='get_full_name', read_only=True)
+
+    class Meta:
+        model = Patient
+        fields = ['id', 'full_name']

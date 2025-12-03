@@ -53,7 +53,9 @@ INSTALLED_APPS = [
     'drf_spectacular',
 
     "users",
-    "patient"
+    "knowledge_base",
+    "patient",
+    'analyze'
 ]
 
 MIDDLEWARE = [
@@ -160,6 +162,8 @@ REST_FRAMEWORK = {
     ],
 
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+
+    "DEFAULT_PAGINATION_CLASS": "utils.pagination.CommonPagination",
 
 }
 
