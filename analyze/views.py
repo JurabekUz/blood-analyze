@@ -1,10 +1,16 @@
 import random
 
+from django.db.models import Count, Avg
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from rest_framework.decorators import action
+from weasyprint import HTML
+
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
-from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
+from analyze.filters import PatientFilter
 from analyze.models import Analyze
 from analyze.serializers import (
     AnalyzePredictSerializer,
@@ -14,6 +20,7 @@ from analyze.serializers import (
     AnalyzeUpdateSerializer
 )
 from knowledge_base.models import Disease
+from patient.models import Patient
 
 
 class AnalyzePredictAPIView(GenericAPIView):
@@ -37,7 +44,8 @@ class AnalyzePredictAPIView(GenericAPIView):
 
 
 class AnalyzeViewSet(ModelViewSet):
-    queryset = Analyze.objects.all()
+    queryset = Analyze.objects.all().order_by('-id')
+    filterset_class = PatientFilter
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -54,3 +62,28 @@ class AnalyzeViewSet(ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+    @action(detail=True, methods=['get'], url_path='pdf')
+    def pdf(self, request, pk=None):
+        analyze = Analyze.objects.select_related(
+            'user', 'patient', 'disease'
+        ).prefetch_related('images').get(pk=pk)
+
+        html_string = render_to_string('analyze.html', {
+            'user': analyze.user.get_full_name(),
+            'patient': analyze.patient.get_full_name(),
+            'disease': analyze.disease.name if analyze.disease else '',
+            'accuracy': analyze.accuracy,
+            'health_score': analyze.health_score,
+            'novelty_score': analyze.novelty_score,
+            'diagnostic_recommendation': analyze.diagnostic_recommendation,
+            'treatment_plan': analyze.treatment_plan,
+            'general_recommendations': analyze.general_recommendations,
+            'images': analyze.images.all(),
+            'hostname': request.get_host(),
+        })
+
+        pdf = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
+
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="analyze_{analyze.id}.pdf"'
+        return response

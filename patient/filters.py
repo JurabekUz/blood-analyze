@@ -1,5 +1,5 @@
 import django_filters
-from django.db.models import F, ExpressionWrapper, IntegerField
+from django.db.models import F, ExpressionWrapper, IntegerField, Case, When, Value
 from datetime import date
 
 from .models import Patient
@@ -29,28 +29,31 @@ class PatientFilter(django_filters.FilterSet):
             'age_to',
         ]
 
-    # Utility to compute age expression
     @staticmethod
     def _age_expression():
         """
-        Compute age in SQL: (today.year - birthday.year) - (today < birthday_this_year)
+        SQL age calculation:
+        age = current_year - birth_year
+              - (birthday has not occurred yet this year)
         """
         today = date.today()
 
         return ExpressionWrapper(
             today.year
             - F("birthday__year")
-            - django_filters.filters.Case(
-                django_filters.filters.When(
-                    birthday__month__gt=today.month,
-                    then=1
-                ),
-                django_filters.filters.When(
+            - Case(
+                # Birthday month is later → not had birthday yet
+                When(birthday__month__gt=today.month, then=Value(1)),
+
+                # Same month, but day not reached yet
+                When(
                     birthday__month=today.month,
                     birthday__day__gt=today.day,
-                    then=1
+                    then=Value(1)
                 ),
-                default=0,
+
+                default=Value(0),
+                output_field=IntegerField(),
             ),
             output_field=IntegerField(),
         )

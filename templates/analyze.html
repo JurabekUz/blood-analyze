@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+
+        .page-break {
+            page-break-before: always;
+        }
+
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 12px;
+        }
+
+        img {
+            width: 100%;
+            height: auto;
+            max-height: 270mm;
+            object-fit: contain;
+        }
+
+        h1, h2 {
+            margin-bottom: 10px;
+        }
+
+        .field {
+            margin-bottom: 6px;
+        }
+
+        .label {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Tibbiy qon tahlil hisoboti</h1>
+
+<div class="field"><span class="label">Shifokor:</span> {{ user }}</div>
+<div class="field"><span class="label">Bemor:</span> {{ patient }}</div>
+<div class="field"><span class="label">Kasallik:</span> {{ disease }}</div>
+
+<div class="field"><span class="label">Tahlil aniqligi:</span> {{ accuracy }}</div>
+<div class="field"><span class="label">Sog'lomlik indeksi:</span> {{ health_score }}</div>
+<div class="field"><span class="label">Anamoliya indeksi:</span> {{ novelty_score }}</div>
+
+<h2>Tavsiya</h2>
+<p>{{ diagnostic_recommendation }}</p>
+
+<h2>Davolash rejasi</h2>
+<p>{{ treatment_plan }}</p>
+
+<h2>Umumiy tavsiyalar</h2>
+<p>{{ general_recommendations }}</p>
+
+{% for image in images %}
+    <div class="page-break"></div>
+    <h2>Rasm {{ forloop.counter }}</h2>
+    <img src="{{ image.file.url }}" />
+{% endfor %}
+
+</body>
+</html>
