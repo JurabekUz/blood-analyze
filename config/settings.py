@@ -55,7 +55,8 @@ INSTALLED_APPS = [
     "users",
     "knowledge_base",
     "patient",
-    'analyze'
+    'analyze',
+    'logs'
 ]
 
 MIDDLEWARE = [

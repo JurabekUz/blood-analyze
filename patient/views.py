@@ -11,6 +11,7 @@ from .serializers import (
     PatientCreateUpdateSerializer,
     PatientSelectSerializer,
 )
+from logs.service import AuditLogService
 
 
 class PatientViewSet(viewsets.ModelViewSet):
@@ -32,12 +33,38 @@ class PatientViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+        AuditLogService.log(
+            request=self.request,
+            action="Yaratish",
+            object_type="Bemor",
+            object_id=serializer.instance.id,
+            description="Bemor yaratildi"
+        )
+
+    def perform_update(self, serializer):
+        serializer.save()
+        AuditLogService.log(
+            request=self.request,
+            action="Tahrirlash",
+            object_type="Bemor",
+            object_id=serializer.instance.id,
+            description="Bemor tahrirlandi"
+        )
 
     def destroy(self, request, *args, **kwargs):
         """Soft delete → is_active = False"""
         instance = self.get_object()
         instance.is_active = False
         instance.save(update_fields=['is_active'])
+        
+        AuditLogService.log(
+            request=self.request,
+            action="O'chirish",
+            object_type="Bemor",
+            object_id=instance.id,
+            description="Bemor o'chirildi"
+        )
+        
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=["get"])
@@ -54,4 +81,3 @@ class PatientViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
-

@@ -24,6 +24,7 @@ from users.serializers import (
 from utils.exceptions import CommonException
 
 from utils.permissions import IsAdmin
+from logs.service import AuditLogService
 
 
 class UserViewSet(ModelViewSet):
@@ -54,6 +55,26 @@ class UserViewSet(ModelViewSet):
         ).values('value', 'label')
         return Response(queryset)
 
+    def perform_create(self, serializer):
+        serializer.save()
+        AuditLogService.log(
+            request=self.request,
+            action="Yaratish",
+            object_type="Foydalanuvchi",
+            object_id=serializer.instance.id,
+            description="Foydalanuvchi yaratildi"
+        )
+
+    def perform_update(self, serializer):
+        serializer.save()
+        AuditLogService.log(
+            request=self.request,
+            action="Tahrirlash",
+            object_type="Foydalanuvchi",
+            object_id=serializer.instance.id,
+            description="Foydalanuvchi tahrirlandi"
+        )
+
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         if instance.role == User.ADMIN:
@@ -63,6 +84,14 @@ class UserViewSet(ModelViewSet):
         instance.is_active = False
         instance.username = f"deleted_{instance.pk}_{get_random_string(5)}"
         instance.save(update_fields=["is_active", "username"])
+
+        AuditLogService.log(
+            request=self.request,
+            action="O'chirish",
+            object_type="Foydalanuvchi",
+            object_id=instance.id,
+            description="Foydalanuvchi o'chirildi"
+        )
 
         return Response(status=HTTP_200_OK)
 
@@ -80,6 +109,14 @@ class LoginView(TokenViewBase):
             raise InvalidToken(e.args[0])
 
         data = serializer.validated_data
+        
+        AuditLogService.log(
+            request=request,
+            action="Login",
+            object_type="Tizim",
+            description=f"Foydalanuvchi tizimga kirdi: {data['user']['username']}"
+        )
+        
         response = Response(data=data['user'], status=HTTP_200_OK)
         response.set_cookie(
             key=settings.SIMPLE_JWT['AUTH_COOKIE'],
@@ -104,6 +141,12 @@ class LoginView(TokenViewBase):
 
 class LogoutView(GenericAPIView):
     def post(self, request, *args, **kwargs):
+        AuditLogService.log(
+            request=request,
+            action="Logout",
+            object_type="Tizim",
+            description="Foydalanuvchi tizimdan chiqdi"
+        )
         response = Response(status=status.HTTP_200_OK)
         response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE'])
         response.delete_cookie(settings.SIMPLE_JWT['AUTH_COOKIE_REFRESH'])

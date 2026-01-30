@@ -1,6 +1,3 @@
-import random
-
-from django.db.models import Count, Avg
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 from rest_framework.decorators import action
@@ -20,26 +17,62 @@ from analyze.serializers import (
     AnalyzeUpdateSerializer
 )
 from knowledge_base.models import Disease
-from patient.models import Patient
+from ml.model import predict_from_multiple_images
+from logs.service import AuditLogService
+
+
+CONFIDENCE_THRESHOLD = 0.75
 
 
 class AnalyzePredictAPIView(GenericAPIView):
     serializer_class = AnalyzePredictSerializer
 
     def post(self, request):
-        serializer = AnalyzePredictSerializer(data=request.data)
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        diseases = Disease.objects.filter(is_active=True)
-        if not diseases.exists():
-            return Response({"detail": "No active diseases found."}, status=400)
+        images = serializer.validated_data["images"]
 
-        disease = random.choice(list(diseases))
-        accuracy = round(random.uniform(0.8, 0.9), 3)
+        result = predict_from_multiple_images(images)
+
+        if result["confidence"] < CONFIDENCE_THRESHOLD:
+            return Response(
+                {
+                    "detail": (
+                        "Aniqlik darajasi past. "
+                        "Iltimos, sifatli va to‘g‘ri rasm(lar) yuboring."
+                    ),
+                    "confidence": f"Aniqlik darajasi: {result['confidence']}",
+                },
+                status=400
+            )
+
+        try:
+            disease = Disease.objects.get(
+                name__iexact=result["class_name"],
+                is_active=True
+            )
+        except Disease.DoesNotExist:
+            return Response(
+                {"detail": "Kasallik bazada topilmadi"},
+                status=400
+            )
+
+        # create a log
+        analyze = AuditLogService.log(
+            request=request,
+            action="Tahlil",
+            object_type="Tahlil",
+            object_id=None,
+            description="Tahlil yaratildi"
+        )
 
         return Response({
-            "disease": {"name": disease.name, "id": disease.id},
-            "accuracy": accuracy,
+            "disease": {
+                "id": disease.id,
+                "name": disease.name,
+            },
+            "accuracy": result["confidence"],
         })
 
 
@@ -61,6 +94,34 @@ class AnalyzeViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+        AuditLogService.log(
+            request=self.request,
+            action="Yaratish",
+            object_type="Tahlil",
+            object_id=serializer.instance.id,
+            description="Tahlil yaratildi"
+        )
+
+    def perform_update(self, serializer):
+        serializer.save()
+        AuditLogService.log(
+            request=self.request,
+            action="Tahrirlash",
+            object_type="Tahlil",
+            object_id=serializer.instance.id,
+            description="Tahlil tahrirlandi"
+        )
+
+    def perform_destroy(self, instance):
+        instance_id = instance.id
+        instance.delete()
+        AuditLogService.log(
+            request=self.request,
+            action="O'chirish",
+            object_type="Tahlil",
+            object_id=instance_id,
+            description="Tahlil o'chirildi"
+        )
 
     @action(detail=True, methods=['get'], url_path='pdf')
     def pdf(self, request, pk=None):
@@ -83,6 +144,14 @@ class AnalyzeViewSet(ModelViewSet):
         })
 
         pdf = HTML(string=html_string, base_url=request.build_absolute_uri()).write_pdf()
+        
+        AuditLogService.log(
+            request=request,
+            action="PDF",
+            object_type="Tahlil",
+            object_id=analyze.id,
+            description="Tahlil PDF yuklab olindi"
+        )
 
         response = HttpResponse(pdf, content_type='application/pdf')
         response['Content-Disposition'] = f'inline; filename="analyze_{analyze.id}.pdf"'
