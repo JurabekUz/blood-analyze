@@ -109,12 +109,13 @@ class LoginView(TokenViewBase):
             raise InvalidToken(e.args[0])
 
         data = serializer.validated_data
-        
+
+        name = data['user']['first_name'] + ' ' + data['user']['last_name']
         AuditLogService.log(
             request=request,
             action="Login",
             object_type="Tizim",
-            description=f"Foydalanuvchi tizimga kirdi: {data['user']['username']}"
+            description=f"Foydalanuvchi tizimga kirdi: {name}"
         )
         
         response = Response(data=data['user'], status=HTTP_200_OK)

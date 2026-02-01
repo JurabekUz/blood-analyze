@@ -10,10 +10,11 @@ MODEL_PATH = settings.BASE_DIR / "ml" / "blood_cell_model.h5"
 model = tf.keras.models.load_model(MODEL_PATH)
 
 CLASS_NAMES = [
-    "anemia",
-    "leukemia",
-    "normal",
-    "thrombocytopenia",
+    "Eritrositlar",
+    "Sog'lom qon donachalari",
+    "Leykositlar",
+    "Noodatiy hujayralar",
+    "Trombositlar"
 ]
 
 
@@ -47,15 +48,13 @@ def predict_from_multiple_images(media_objects):
 
     preds = model.predict(batch)
 
-    print(model.output_shape)
-    print(model.summary())
-
     mean_probs = np.mean(preds, axis=0)
 
     class_index = int(np.argmax(mean_probs))
     confidence = float(np.max(mean_probs))
 
     return {
+        "class_index": class_index,
         "class_name": CLASS_NAMES[class_index],
         "confidence": round(confidence, 3),
         "raw_probs": mean_probs.tolist(),

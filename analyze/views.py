@@ -49,7 +49,7 @@ class AnalyzePredictAPIView(GenericAPIView):
 
         try:
             disease = Disease.objects.get(
-                name__iexact=result["class_name"],
+                code=result["class_index"],
                 is_active=True
             )
         except Disease.DoesNotExist:
@@ -59,7 +59,7 @@ class AnalyzePredictAPIView(GenericAPIView):
             )
 
         # create a log
-        analyze = AuditLogService.log(
+        AuditLogService.log(
             request=request,
             action="Tahlil",
             object_type="Tahlil",
